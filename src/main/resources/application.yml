@@ -13,6 +13,8 @@ spring:
       hibernate:
         #show_sql: true
         format_sql: true
+        #use_sql_comments를 사용하면 일반적인 쿼리가 보임.
+        #use_sql_comments: true
 
 logging.level:
   org.hibernate.SQL: debug

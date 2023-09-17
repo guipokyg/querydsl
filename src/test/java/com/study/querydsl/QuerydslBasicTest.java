@@ -274,7 +274,7 @@ public class QuerydslBasicTest {
     }
 
     /**
-     * 세타 조인
+     * 세타 조인 - 외부조인이 불가능 (left outer join 이런게 불가능)
      */
     @Test
     public void theta_join(){
@@ -290,5 +290,32 @@ public class QuerydslBasicTest {
         assertThat(result)
                 .extracting("username")
                 .containsExactly("teamA", "teamB");
+    }
+
+    /**
+     * (외부조인)아우터조인 사용법
+     */
+    @Test
+    public void join_on_filtering(){
+        List<Tuple> result = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(member.team, team).on(team.name.eq("teamA"))
+                .fetch();
+
+        result.forEach(obj ->{
+            System.out.println("obj = " + obj);
+        });
+
+        //이것도 결과는 같음
+        List<Tuple> result3 = queryFactory
+                .select(member,team)
+                .from(member)
+                .leftJoin(team)
+                .on(member.team.eq(team),team.name.eq("teamA"))
+                .fetch();
+        result3.forEach(obj ->{
+            System.out.println("obj3 = " + obj);
+        });
     }
 }

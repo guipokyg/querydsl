@@ -1,9 +1,12 @@
 package com.study.querydsl;
 
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
@@ -13,8 +16,8 @@ import com.study.querydsl.dto.MemberDto;
 import com.study.querydsl.dto.UserDto;
 import com.study.querydsl.entity.Member;
 import com.study.querydsl.entity.QMember;
-import com.study.querydsl.entity.QTeam;
 import com.study.querydsl.entity.Team;
+import com.sun.java.accessibility.util.EventID;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceUnit;
@@ -127,7 +130,7 @@ public class QuerydslBasicTest {
      */
     @Test
     public void search(){
-        
+
         Member findMember = queryFactory
                 .selectFrom(member)
                 //이것도 AND  조건임
@@ -205,7 +208,7 @@ public class QuerydslBasicTest {
 
     @Test
     public void paging1(){
-        
+
         //offset,Limit로 처리
         List<Member> result = queryFactory
                 .selectFrom(member)
@@ -394,8 +397,8 @@ public class QuerydslBasicTest {
         boolean loaded = emf.getPersistenceUnitUtil().isLoaded(findMember.getTeam());
         assertThat(loaded).as("패치조인 적용").isTrue();
     }
-    
-    
+
+
 
     /**
      * //서브쿼리
@@ -481,7 +484,7 @@ public class QuerydslBasicTest {
                         .otherwise("기타"))
                 .from(member)
                 .fetch();
-        
+
         for (String s: result){
             System.out.println("s = " + s);
         }
@@ -611,9 +614,137 @@ public class QuerydslBasicTest {
                         member.age))
                 .from(member)
                 .fetch();
-        
+
         for (UserDto dto : result){
             System.out.println("dto = " + dto);
         }
+    }
+
+    @Test
+    public void findDtoByQueryProjection(){
+        queryFactory.select()
+                .from(member)
+                .fetch();
+    }
+
+    //@QueryProjection 활용
+
+    @Test
+    public void queryProjection(){
+        /*List<MemberDto> result = queryFactory
+                .select(new QMemberDto(member.username, member.age))
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }*/
+    }
+
+    @Test
+    public void  distinct(){
+        List<String> result = queryFactory
+                .select(member.username).distinct()
+                .from(member)
+                .fetch();
+    }
+
+    /**  동적쿼리------ 처리 */
+    @Test
+    public void dynamicQuery_BooleanBuilder() throws Exception {
+        String usernameParam = "member1";
+        Integer ageParam = 10;
+        List<Member> result = searchMember1(usernameParam, ageParam);
+        Assertions.assertThat(result.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMember1(String usernameCond, Integer ageCond) {
+        BooleanBuilder builder = new BooleanBuilder();
+
+        //아래처럼 초기값 세팅가능
+        //BooleanBuilder builder = new BooleanBuilder(member.username.eq(usernameCond));
+
+        if (usernameCond != null) {
+            builder.and(member.username.eq(usernameCond));
+        }
+        if (ageCond != null) {
+            builder.and(member.age.eq(ageCond));
+        }
+        return queryFactory
+                .selectFrom(member)
+                .where(builder)
+                .fetch();
+    }
+
+    @Test
+    public void dynamicQuery_WhereParam() throws Exception {
+        String usernameParam = "member1";
+        Integer ageParam = 10;
+        List<Member> result = searchMember2(usernameParam, ageParam);
+        Assertions.assertThat(result.size()).isEqualTo(1);
+    }
+    private List<Member> searchMember2(String usernameCond, Integer ageCond) {
+        return queryFactory
+                .selectFrom(member)
+                .where(usernameEq(usernameCond), ageEq(ageCond))
+                .fetch();
+    }
+
+    private BooleanExpression usernameEq(String usernameCond) {
+        return usernameCond != null ? member.username.eq(usernameCond) : null;
+    }
+    private BooleanExpression ageEq(Integer ageCond) {
+        return ageCond != null ? member.age.eq(ageCond) : null;
+    }
+
+    //조합가능
+    private BooleanExpression allEq(String usernameCond, Integer ageCond) {
+        return usernameEq(usernameCond).and(ageEq(ageCond));
+    }
+
+    @Test
+    public void bulkUpdate(){
+        long count = queryFactory.update(member)
+                .set(member.username, "비회원")
+                .where(member.age.lt(28))
+                .execute();
+        //벌크연산을 사용하면..영속성컨텍스트와 동기화안되는 문제가 있다
+        //초기화를 시켜주자
+        em.flush();
+        em.clear();
+
+    }
+
+    @Test
+    public void bulkAdd(){
+        long count = queryFactory
+                .update(member)
+                .set(member.age, member.age.add(1))
+                .execute();
+        //multiply >> 곱하기
+    }
+
+    @Test
+    public void bulkDelete(){
+        long count = queryFactory
+                .delete(member)
+                .where(member.age.gt(18))
+                .execute();
+
+    }
+
+    @Test
+    public void sqlFunction(){
+        String result = queryFactory
+                .select(Expressions.stringTemplate("function('replace', {0}, {1},{2})", member.username, "member", "M"))
+                .from(member)
+                .fetchFirst();
+
+        List<String> fetch = queryFactory
+                .select(member.username)
+                .from(member)
+                //.where(member.username.eq(Expressions.stringTemplate("function('lower', {0})", member.username)))
+                .where(member.username.eq(member.username.lower()))
+                .fetch();
     }
 }

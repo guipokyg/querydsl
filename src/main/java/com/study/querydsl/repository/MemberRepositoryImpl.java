@@ -66,7 +66,7 @@ public class MemberRepositoryImpl implements MemberRepositoryCustom {
                 )
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
-                .fetchResults(); //fetchResults는 카운트까지 두번 쿼리가 나간다.
+                .fetchResults(); //fetchResults는 카운트까지 두번 쿼리가 나간다.--> 향후미지원. 카운트쿼리를 따로 만들어야함
 
         List<MemberTeamDto> content = results.getResults();
         long total = results.getTotal();
@@ -107,7 +107,7 @@ public class MemberRepositoryImpl implements MemberRepositoryCustom {
                         teamNameEq(condition.getTeamName()),
                         ageGoe(condition.getAgeGoe()),
                         ageLoe(condition.getAgeLoe()))
-                .fetchCount();
+                .fetchCount();//--> 향후 미지원, 카운트 쿼리를 따로 만들어야함.
 
         return new PageImpl<>(content, pageable, total);
     }
@@ -141,8 +141,8 @@ public class MemberRepositoryImpl implements MemberRepositoryCustom {
                 .limit(pageable.getPageSize())
                 .fetch(); //fetchResults는 카운트까지 두번 쿼리가 나간다.
 
-        JPAQuery<Member> countQuery = queryFactory
-                .select(member)
+        JPAQuery<Long> countQuery = queryFactory
+                .select(member.count())
                 .from(member)
                 .leftJoin(member.team, team)
                 .where(usernameEq(condition.getUsername()),
@@ -150,7 +150,7 @@ public class MemberRepositoryImpl implements MemberRepositoryCustom {
                         ageGoe(condition.getAgeGoe()),
                         ageLoe(condition.getAgeLoe()));
 // return new PageImpl<>(content, pageable, total);
-        return PageableExecutionUtils.getPage(content, pageable,countQuery::fetchCount);
+        return PageableExecutionUtils.getPage(content, pageable,countQuery::fetchOne);
     }
 
     private BooleanExpression usernameEq(String username) {
